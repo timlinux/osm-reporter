@@ -8,7 +8,7 @@ env.use_ssh_config = True
 env.hosts = ['linfiniti2']
 env.sitename = 'osm-reporter'
 env.path = '/home/web/%s' % (env.sitename,)
-env.repo = 'git://github.com/timlinux/osm-reporter.git'
+env.repo = 'git://github.com:timlinux/osm-reporter.git'
 
 def _install_dependencies():
     """Use pip to install required packages."""
@@ -33,6 +33,9 @@ def _pull():
 
 def _deploy():
     """Deploy the website."""
+    with cd('%(path)s' % env):
+        if not exists(env.path + '/log'):
+            run('mkdir -p %s/log' % env.path)
     _pull()
     _install_dependencies()
     with cd('%(path)s' % env):
