@@ -9,6 +9,7 @@ from reporter.core import (
     osm_object_contributions,
     get_totals)
 from reporter.osm import osm_nodes_by_user, get_osm_file
+from reporter.static import static_file
 from reporter.logger import setup_logger
 
 setup_logger()
