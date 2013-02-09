@@ -1,9 +1,10 @@
 import urllib2
 import optparse
-import logging
 
-from flask import Flask, request, jsonify, render_template
-
+from flask import request, jsonify, render_template
+# App declared directly in __init__ as per
+# http://flask.pocoo.org/docs/patterns/packages/#larger-applications
+from reporter import app
 from reporter import config
 from reporter.utilities import (
     split_bbox,
@@ -11,16 +12,14 @@ from reporter.utilities import (
     get_totals, osm_nodes_by_user)
 from reporter.osm import get_osm_file
 from reporter.static import static_file
-from reporter.logger import setup_logger
-
-setup_logger()
-LOGGER = logging.getLogger('osm-reporter')
-
-app = Flask(__name__)
 
 
 @app.route('/')
 def home():
+    """Home page view.
+
+    On this page a map and the report will be shown.
+    """
     mySortedUserList = []
     bbox = request.args.get('bbox', config.BBOX)
     myTagName = request.args.get('obj', config.TAG_NAMES[0])

@@ -1,7 +1,7 @@
 import ast
 import os
 
-from reporter.app import app
+from reporter.views import app
 from reporter.utilities import (
     osm_object_contributions,
     get_totals,
