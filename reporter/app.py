@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 
 @app.route('/')
-def current_status():
+def home():
     mySortedUserList = []
     bbox = request.args.get('bbox', config.BBOX)
     myTagName = request.args.get('obj', config.TAG_NAMES[0])
