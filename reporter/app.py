@@ -3,6 +3,7 @@ import optparse
 import logging
 
 from flask import Flask, request, jsonify, render_template
+
 from reporter import config
 from reporter.core import (
     split_bbox,
@@ -58,7 +59,7 @@ def current_status():
         error=error,
         coordinates=coordinates,
         display_update_control=int(config.DISPLAY_UPDATE_CONTROL),
-        )
+    )
     return render_template('base.html', **context)
 
 

@@ -33,12 +33,13 @@ class OsmParser(xml.sax.ContentHandler):
             value += 1
             self.userDayCountDict[self.user][date_part] = value
 
-
         elif name == 'nd' and self.inWay:
             self.nodeCount += 1
+
         elif name == 'tag' and self.inWay:
             if (attrs.getValue('k') == self.tagName):
                 self.found = True
+
         else:
             pass
             #print 'Node not known %s' % name

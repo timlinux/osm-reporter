@@ -1,11 +1,12 @@
 import hashlib
 import urllib2
 import os
+import xml
+import time
+
 from reporter import config
 from reporter.core import LOGGER
 from reporter.osm_parser import OsmNodeParser
-
-__author__ = 'timlinux'
 
 
 def osm_nodes_by_user(theFile, username):

@@ -1,8 +1,6 @@
 import logging
 import os
 
-__author__ = 'timlinux'
-
 
 def add_handler_once(logger, handler):
     """A helper to add a handler to a logger, ensuring there are no duplicates.

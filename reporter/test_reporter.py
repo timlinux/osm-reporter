@@ -100,8 +100,7 @@ class CoreTestCase(TestCaseLogger):
             os.path.dirname(os.path.realpath(__file__)),
             'test_data',
             'expected_osm_building_contributions.txt'
-        ),'rt').read())
-
+        ), 'rt').read())
 
         self.maxDiff = None
         print myList
