@@ -5,7 +5,7 @@ import xml
 import time
 
 from reporter import config
-from reporter.core import LOGGER
+from reporter.utilities import LOGGER
 from reporter.osm_parser import OsmNodeParser
 
 

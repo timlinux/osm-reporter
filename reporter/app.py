@@ -5,7 +5,7 @@ import logging
 from flask import Flask, request, jsonify, render_template
 
 from reporter import config
-from reporter.core import (
+from reporter.utilities import (
     split_bbox,
     osm_object_contributions,
     get_totals)
