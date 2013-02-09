@@ -1,130 +1,31 @@
-import os
-import urllib2
-import time
-import optparse
-import hashlib
+
 import xml.sax
+import logging
+
+import time
 from datetime import date, timedelta
 import time
 
-import logging
-import logging.handlers
-
-from flask import Flask, request, render_template, abort, Response, jsonify
-
 import config
-from osm_parser import OsmParser, OsmNodeParser
+from reporter.osm_parser import OsmParser
+from reporter.logger import setup_logger
 
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)),
-    os.path.pardir,
-    'reporter.db'
-)
-
+setup_logger()
 LOGGER = logging.getLogger('osm-reporter')
 
-app = Flask(__name__)
-# If you need to debug 500 errors, set debug to True in flask-config.py
-app.config.from_pyfile('flask-config.py')
 
-
-def get_osm_file(bbox, coordinates):
-    # Note bbox is min lat, min lon, max lat, max lon
-    myUrlPath = ('http://overpass-api.de/api/interpreter?data='
-                 '(node({SW_lat},{SW_lng},{NE_lat},{NE_lng});<;);out+meta;'
-                 .format(**coordinates))
-    safe_name = hashlib.md5(bbox).hexdigest() + '.osm'
-    myFilePath = os.path.join(
-        config.CACHE_DIR,
-        safe_name)
-    return load_osm_document(myFilePath, myUrlPath)
-
-
-@app.route('/')
-def current_status():
-    mySortedUserList = []
-    bbox = request.args.get('bbox', config.BBOX)
-    tag_name = request.args.get('obj', config.TAG_NAMES[0])
-    error = None
-    try:
-        coordinates = split_bbox(bbox)
-    except ValueError:
-        error = "Invalid bbox"
-        coordinates = split_bbox(config.BBOX)
-    else:
-        try:
-            myFile = get_osm_file(bbox, coordinates)
-        except urllib2.URLError:
-            error = "Bad request. Maybe the bbox is too big!"
-        else:
-            if not tag_name in config.TAG_NAMES:
-                error = "Unsupported object type"
-            else:
-                mySortedUserList = osm_object_contributions(myFile, tag_name)
-
-    myNodeCount, myWayCount = get_totals(mySortedUserList)
-
-    # We need to manually cast float in string, otherwise floats are
-    # truncated, and then rounds in Leaflet result in a wrong bbox
-    # Note: slit_bbox should better keep returning real floats
-    coordinates = dict((k, repr(v)) for k, v in coordinates.iteritems())
-
-    context = dict(
-        mySortedUserList=mySortedUserList,
-        myWayCount=myWayCount,
-        myNodeCount=myNodeCount,
-        myUserCount=len(mySortedUserList),
-        bbox=bbox,
-        current_tag_name=tag_name,
-        available_tag_names=config.TAG_NAMES,
-        error=error,
-        coordinates=coordinates,
-        display_update_control=int(config.DISPLAY_UPDATE_CONTROL),
-    )
-    return render_template('base.html', **context)
-
-@app.route('/user')
-def user_status():
-    """Get nodes for user as a json doc.
-
-        TODO: What is this used for?
-
-        To use e.g.: http://localhost:5000/user?bbox=20.431909561157227,
-        -34.02849543118406,20.45207977294922,-34.02227106658948&
-        obj=building&username=timlinux
-    """
-    username = request.args.get('username')
-    bbox = request.args.get('bbox')
-
-    try:
-        coordinates = split_bbox(bbox)
-    except ValueError:
-        error = "Invalid bbox"
-        coordinates = split_bbox(config.BBOX)
-        LOGGER.exception(error + coordinates)
-    else:
-        try:
-            myFile = get_osm_file(bbox, coordinates)
-        except urllib2.URLError:
-            error = "Bad request. Maybe the bbox is too big!"
-            LOGGER.exception(error + coordinates)
-        else:
-            node_data = osm_nodes_by_user(myFile, username)
-            return jsonify(d=node_data)
-
-
-def get_totals(theSortedUserList):
+def get_totals(sorted_user_list):
     """Given a sorted user list, get the totals for ways and nodes.
 
     Args:
-        theSortedUserList: list - of user dicts sorted by number of ways.
+        sorted_user_list: list - of user dicts sorted by number of ways.
 
     Returns:
-        (int, int): two-tuple containing waycount, node count.
+        (int, int): two-tuple containing way count, node count.
     """
     myWayCount = 0
     myNodeCount = 0
-    for myUser in theSortedUserList:
+    for myUser in sorted_user_list:
         myWayCount += myUser['ways']
         myNodeCount += myUser['nodes']
     return myNodeCount, myWayCount
@@ -153,42 +54,12 @@ def split_bbox(bbox):
     return coordinates
 
 
-def load_osm_document(theFilePath, theUrlPath):
-    """Load an osm document, refreshing it if the cached copy is stale.
-
-    To save bandwidth the file is not downloaded if it is less than 1 hour old.
-
-     Args:
-        * theUrlPath - (Mandatory) The path (relative to the ftp root)
-          from which the file should be retrieved.
-        * theFilePath - (Mandatory). The path on the filesystem to which
-          the file should be saved.
-     Returns:
-         file object for the the downloaded file.
-
-     Raises:
-         None
-    """
-    myElapsedSeconds = 0
-    if os.path.exists(theFilePath):
-        myTime = time.time()  # in unix epoch
-        myFileTime = os.path.getmtime(theFilePath)  # in unix epoch
-        myElapsedSeconds = myTime - myFileTime
-        if myElapsedSeconds > 3600:
-            os.remove(theFilePath)
-    if myElapsedSeconds > 3600 or not os.path.exists(theFilePath):
-        fetch_osm(theUrlPath, theFilePath)
-        LOGGER.info('fetched %s' % theFilePath)
-    myFile = open(theFilePath, 'rt')
-    return myFile
-
-
-def osm_object_contributions(theFile, tagName):
-    """Compile a summary of user contributions for buildings.
+def osm_object_contributions(osm_file, tag_name):
+    """Compile a summary of user contributions for the selected osm data type.
 
     Args:
-        theFile: a file object reading from a .osm file.
-        tagName: the tag name we want to filter on.
+        osm_file: file - a file object reading from a .osm file.
+        tag_name: str - the tag name we want to filter on.
 
     Returns:
         list: a list of dicts where items in the list are sorted from highest
@@ -210,8 +81,8 @@ def osm_object_contributions(theFile, tagName):
     Raises:
         None
     """
-    myParser = OsmParser(tagName=tagName)
-    xml.sax.parse(theFile, myParser)
+    myParser = OsmParser(tagName=tag_name)
+    xml.sax.parse(osm_file, myParser)
     myWayCountDict = myParser.wayCountDict
     myNodeCountDict = myParser.nodeCountDict
     myTimeLines = myParser.userDayCountDict
@@ -250,11 +121,15 @@ def osm_object_contributions(theFile, tagName):
     return mySortedUserList
 
 
-def date_range(theTimeline):
+def date_range(timeline):
     """Given a timeline, determine the start and end dates.
 
+    The timeline may be sparse (containing fewer entries than all the dates
+    between the min and max dates) and since it is a dict,
+    the dates may be in any order.
+
     Args:
-        theTimeline: dict - a dictionary of non sequential dates (in
+        timeline: dict - a dictionary of non-sequential dates (in
             YYYY-MM-DD) as keys and values (representing ways collected on that
             day).
 
@@ -266,7 +141,7 @@ def date_range(theTimeline):
     """
     myStartDate = None
     myEndDate = None
-    for myDate in theTimeline.keys():
+    for myDate in timeline.keys():
         myYear, myMonth, myDay = myDate.split('-')
         LOGGER.info('Date: %s' % myDate)
         myTimelineDate = date(int(myYear), int(myMonth), int(myDay))
@@ -281,11 +156,16 @@ def date_range(theTimeline):
     return myStartDate, myEndDate
 
 
-def interpolated_timeline(theTimeline):
+def interpolated_timeline(timeline):
     """Interpolate a timeline given a sparse timeline.
 
+    A sparse timelines is a sequence of dates containing no days of zero
+    activity. An interpolated timeline is a sequence of dates where there is
+    an entry per day in the date range regardless of whether there was any
+    activity or not.
+
     Args:
-        theTimeline: dict - a dictionary of non sequential dates (in
+        timeline: dict - a dictionary of non sequential dates (in
             YYYY-MM-DD) as keys and values (representing ways collected on that
             day).
 
@@ -311,13 +191,13 @@ def interpolated_timeline(theTimeline):
             ]
     """
     # Work out the earliest and latest day
-    myStartDate, myEndDate = date_range(theTimeline)
+    myStartDate, myEndDate = date_range(timeline)
     # Loop through them, adding an entry for each day
     myTimeline = '['
     for myDate in date_range_iterator(myStartDate, myEndDate):
         myDateString = time.strftime('%Y-%m-%d', myDate.timetuple())
-        if myDateString in theTimeline:
-            myValue = theTimeline[myDateString]
+        if myDateString in timeline:
+            myValue = timeline[myDateString]
         else:
             myValue = 0
         if myTimeline != '[':
@@ -328,155 +208,18 @@ def interpolated_timeline(theTimeline):
 
 
 def date_range_iterator(start_date, end_date):
-    """Given two dates return a collection of dates between start and end."""
-    for n in range(int ((end_date - start_date).days) + 1):
-        yield start_date + timedelta(n)
-
-
-def fetch_osm(theUrlPath, theFilePath):
-    """Fetch an osm map and store locally.
-
-     Args:
-        * theUrlPath - (Mandatory) The path (relative to the ftp root)
-          from which the file should be retrieved.
-        * theFilePath - (Mandatory). The path on the filesystem to which
-          the file should be saved.
-
-     Returns:
-         The path to the downloaded file.
-
-     Raises:
-         None
-    """
-    LOGGER.debug('Getting URL: %s', theUrlPath)
-    myRequest = urllib2.Request(theUrlPath)
-    try:
-        myUrlHandle = urllib2.urlopen(myRequest, timeout=60)
-        myFile = file(theFilePath, 'wb')
-        myFile.write(myUrlHandle.read())
-        myFile.close()
-    except urllib2.URLError, e:
-        LOGGER.exception('Bad Url or Timeout')
-        raise
-
-
-def osm_nodes_by_user(theFile, username):
-    myParser = OsmNodeParser(username)
-    xml.sax.parse(theFile, myParser)
-    return myParser.nodes
-
-
-def addLoggingHanderOnce(theLogger, theHandler):
-    """A helper to add a handler to a logger, ensuring there are no duplicates.
+    """Given two dates return a collection of dates between start and end.
 
     Args:
-        * theLogger: logging.logger instance
-        * theHandler: logging.Handler instance to be added. It will not be
-            added if an instance of that Handler subclass already exists.
+        * start_date: date instance representing the start date.
+        * end_date: date instance representing the end date.
 
     Returns:
-        bool: True if the logging handler was added
+        Iteratable collection yielding dates.
 
     Raises:
         None
     """
-    myClassName = theHandler.__class__.__name__
-    for myHandler in theLogger.handlers:
-        if myHandler.__class__.__name__ == myClassName:
-            return False
+    for n in range(int ((end_date - start_date).days) + 1):
+        yield start_date + timedelta(n)
 
-    theLogger.addHandler(theHandler)
-    return True
-
-
-def setupLogger():
-    """Set up our logger.
-
-    Args: None
-
-    Returns: None
-
-    Raises: None
-    """
-    myLogger = logging.getLogger('osm-reporter')
-    myLogger.setLevel(logging.DEBUG)
-    myDefaultHanderLevel = logging.DEBUG
-    # create formatter that will be added to the handlers
-    myFormatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    myTempDir = ('/tmp')
-    myFilename = os.path.join(myTempDir, 'reporter.log')
-    myFileHandler = logging.FileHandler(myFilename)
-    myFileHandler.setLevel(myDefaultHanderLevel)
-    # create console handler with a higher log level
-    myConsoleHandler = logging.StreamHandler()
-    myConsoleHandler.setLevel(logging.ERROR)
-
-    try:
-        #pylint: disable=F0401
-        from raven.handlers.logging import SentryHandler
-        from raven import Client
-        #pylint: enable=F0401
-        myClient = Client(
-            'http://12ef42a1d4394255a2041ac0428e8ef7:'
-            '755880e336f54892bc2a65d308019997@sentry.linfiniti.com/6')
-        mySentryHandler = SentryHandler(myClient)
-        mySentryHandler.setFormatter(myFormatter)
-        mySentryHandler.setLevel(logging.ERROR)
-        addLoggingHanderOnce(myLogger, mySentryHandler)
-        myLogger.debug('Sentry logging enabled')
-
-    except:
-        myLogger.debug('Sentry logging disabled. Try pip install raven')
-
-    #Set formatters
-    myFileHandler.setFormatter(myFormatter)
-    myConsoleHandler.setFormatter(myFormatter)
-
-    # add the handlers to the logger
-    addLoggingHanderOnce(myLogger, myFileHandler)
-    addLoggingHanderOnce(myLogger, myConsoleHandler)
-
-#
-# These are only used to serve static files when testing
-#
-file_suffix_to_mimetype = {
-    '.css': 'text/css',
-    '.jpg': 'image/jpeg',
-    '.html': 'text/html',
-    '.ico': 'image/x-icon',
-    '.png': 'image/png',
-    '.js': 'application/javascript'
-}
-
-
-def static_file(path):
-    try:
-        f = open(path)
-    except IOError, e:
-        abort(404)
-        return
-    root, ext = os.path.splitext(path)
-    if ext in file_suffix_to_mimetype:
-        return Response(f.read(), mimetype=file_suffix_to_mimetype[ext])
-    return f.read()
-
-
-if __name__ == '__main__':
-    setupLogger()
-    parser = optparse.OptionParser()
-    # This doesnt seem to work, flask-config.py option described near the
-    # top of this file does.
-    parser.add_option('-d', '--debug', dest='debug', default=False,
-                      help='turn on Flask debugging', action='store_true')
-
-    options, args = parser.parse_args()
-
-    if options.debug:
-        LOGGER.info('Running in debug mode')
-        app.debug = True
-        # set up flask to serve static content
-        app.add_url_rule('/<path:path>', 'static_file', static_file)
-    else:
-        LOGGER.info('Running in production mode')
-    app.run()
