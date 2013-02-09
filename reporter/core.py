@@ -27,6 +27,7 @@ app = Flask(__name__)
 # If you need to debug 500 errors, set debug to True in flask-config.py
 app.config.from_pyfile('flask-config.py')
 
+
 def get_osm_file(bbox, coordinates):
     # Note bbox is min lat, min lon, max lat, max lon
     myUrlPath = ('http://overpass-api.de/api/interpreter?data='
@@ -60,7 +61,6 @@ def current_status():
                 error = "Unsupported object type"
             else:
                 mySortedUserList = osm_object_contributions(myFile, tag_name)
-
 
     myNodeCount, myWayCount = get_totals(mySortedUserList)
 
@@ -326,10 +326,12 @@ def interpolated_timeline(theTimeline):
     myTimeline += ']'
     return myTimeline
 
+
 def date_range_iterator(start_date, end_date):
     """Given two dates return a collection of dates between start and end."""
     for n in range(int ((end_date - start_date).days) + 1):
         yield start_date + timedelta(n)
+
 
 def fetch_osm(theUrlPath, theFilePath):
     """Fetch an osm map and store locally.
@@ -357,10 +359,12 @@ def fetch_osm(theUrlPath, theFilePath):
         LOGGER.exception('Bad Url or Timeout')
         raise
 
+
 def osm_nodes_by_user(theFile, username):
     myParser = OsmNodeParser(username)
     xml.sax.parse(theFile, myParser)
     return myParser.nodes
+
 
 def addLoggingHanderOnce(theLogger, theHandler):
     """A helper to add a handler to a logger, ensuring there are no duplicates.
@@ -413,7 +417,8 @@ def setupLogger():
         from raven.handlers.logging import SentryHandler
         from raven import Client
         #pylint: enable=F0401
-        myClient = Client('http://12ef42a1d4394255a2041ac0428e8ef7:'
+        myClient = Client(
+            'http://12ef42a1d4394255a2041ac0428e8ef7:'
             '755880e336f54892bc2a65d308019997@sentry.linfiniti.com/6')
         mySentryHandler = SentryHandler(myClient)
         mySentryHandler.setFormatter(myFormatter)
@@ -423,8 +428,6 @@ def setupLogger():
 
     except:
         myLogger.debug('Sentry logging disabled. Try pip install raven')
-
-
 
     #Set formatters
     myFileHandler.setFormatter(myFormatter)
