@@ -1,11 +1,12 @@
-
+import xml
 import xml.sax
 import logging
 import time
 from datetime import date, timedelta
 
 import config
-from reporter.osm_parser import OsmParser
+from reporter.osm_node_parser import OsmNodeParser
+from reporter.osm_way_parser import OsmParser
 from reporter.logger import setup_logger
 
 setup_logger()
@@ -136,6 +137,9 @@ def date_range(timeline):
             line.
         myEndDate - a date object representing the newest date in the time
             line.
+
+    Raises:
+        None
     """
     myStartDate = None
     myEndDate = None
@@ -220,3 +224,21 @@ def date_range_iterator(start_date, end_date):
     """
     for n in range(int((end_date - start_date).days) + 1):
         yield start_date + timedelta(n)
+
+
+def osm_nodes_by_user(theFile, username):
+    """Obtain the nodes collected by a single user from an OSM file.
+
+    Args:
+        theFile: file - file handle to an open OSM XML document.
+        username: str - name of the user for whom nodes should be collected.
+
+    Returns:
+        list: a list of nodes for the given user.
+
+    Raises:
+        None
+    """
+    myParser = OsmNodeParser(username)
+    xml.sax.parse(theFile, myParser)
+    return myParser.nodes

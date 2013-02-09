@@ -8,8 +8,8 @@ from reporter import config
 from reporter.utilities import (
     split_bbox,
     osm_object_contributions,
-    get_totals)
-from reporter.osm import osm_nodes_by_user, get_osm_file
+    get_totals, osm_nodes_by_user)
+from reporter.osm import get_osm_file
 from reporter.static import static_file
 from reporter.logger import setup_logger
 

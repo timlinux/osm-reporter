@@ -1,7 +1,7 @@
 import xml
 
 from reporter.test.logged_unittest import LoggedTestCase
-from reporter.osm_parser import OsmParser
+from reporter.osm_way_parser import OsmParser
 from reporter.test.helpers import FIXTURE_PATH
 
 

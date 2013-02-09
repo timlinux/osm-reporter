@@ -53,7 +53,6 @@ class AppTestCase(LoggedTestCase):
 
         myFile = load_osm_document(myFilePath, myUrl)
         myFileTime = os.path.getmtime(myFilePath)
-        myString = myFile.read()
         #
         # This one should be cached now....
         #

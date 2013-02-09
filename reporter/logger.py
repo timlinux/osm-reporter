@@ -62,7 +62,7 @@ def setup_logger():
         add_handler_once(myLogger, mySentryHandler)
         myLogger.debug('Sentry logging enabled')
 
-    except:
+    except ImportError:
         myLogger.debug('Sentry logging disabled. Try pip install raven')
 
     #Set formatters

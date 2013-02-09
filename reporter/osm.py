@@ -1,29 +1,33 @@
 import hashlib
 import urllib2
-import os
-import xml
 import time
+import os
 
 from reporter import config
 from reporter.utilities import LOGGER
-from reporter.osm_parser import OsmNodeParser
-
-
-def osm_nodes_by_user(theFile, username):
-    myParser = OsmNodeParser(username)
-    xml.sax.parse(theFile, myParser)
-    return myParser.nodes
 
 
 def get_osm_file(bbox, coordinates):
+    """Fetch an osm file given a bounding box using the overpas API.
+
+    Args:
+        bbox: list - [min lat, min lon, max lat, max lon]
+        coordinates: TODO: document this
+
+    Returns:
+        file: a file object which has been opened on the retrieved OSM dataset.
+
+    Raises:
+        None
+    """
     # Note bbox is min lat, min lon, max lat, max lon
     myUrlPath = ('http://overpass-api.de/api/interpreter?data='
                  '(node({SW_lat},{SW_lng},{NE_lat},{NE_lng});<;);out+meta;'
                  .format(**coordinates))
-    safe_name = hashlib.md5(bbox).hexdigest() + '.osm'
+    mySafeName = hashlib.md5(bbox).hexdigest() + '.osm'
     myFilePath = os.path.join(
         config.CACHE_DIR,
-        safe_name)
+        mySafeName)
     return load_osm_document(myFilePath, myUrlPath)
 
 
@@ -79,6 +83,6 @@ def fetch_osm(theUrlPath, theFilePath):
         myFile = file(theFilePath, 'wb')
         myFile.write(myUrlHandle.read())
         myFile.close()
-    except urllib2.URLError, e:
+    except urllib2.URLError:
         LOGGER.exception('Bad Url or Timeout')
         raise
