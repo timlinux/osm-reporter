@@ -176,7 +176,7 @@ includes the following:
 
 (Update these paths as needed to match your system)
 
-* Logging
+# Logging
 
 OSM-Reporter will log requests as geojson files - one file per request.
 The attributes of each geojson file will contain the following:
@@ -274,13 +274,36 @@ There is a test suite available, you can run it using nose e.g.:
     PYTHONPATH=`pwd`/reporter:`pwd`:${PYTHONPATH} nosetests -v --with-id \
     --with-xcoverage --with-xunit --verbose --cover-package=reporter reporter
 
-On MacOS
+## On MacOS within pycharm:
 
 Assumptions:
 
 * You have chrome installed
 * You have brew installed
-* You have postgres.app installed
+* You have docker installed
+
+## Install postgis in brew
+
+You need this to have the shp2pgsql and psql command line tools
+available on your system.
+
+brew install postgis
+
+
+### Run postgis in docker
+
+First pull and run our postgis image from docker:
+
+    docker run --name "osm-reporter-postgis" -p 5433:5432 -d -t kartoza/postgis
+
+
+This will create a dedicated instance of postgis we can test against.
+When you are done using it, you can stop or kill it using docker e.g.
+
+    docker kill osm-reporter-postgis
+
+
+### Selenium
 
 For selenium tests you need to install chromedriver:
 
@@ -293,7 +316,7 @@ And ensure that the chromedriver executable is in your path:
 (If you are using pycharm you could add this path to your test runner
 configuration.)
 
-Before you run the tests, be sure to launch the chromedriver:
+Before you run the tests, be you may need to launch the chromedriver:
 
     chromedriver
 
@@ -301,16 +324,39 @@ Brew installation of chromedriver will also give you notes on how to
 run this via launchd if you do not feel inclined to start chromedriver
 each time.
 
-Ensure you have your template_postgis etc. set up (described further up in
-this document) and that your path includes the Postgres.app bin directory:
+
+### Running tests from command line
 
     export PYTHONPATH=`pwd`/reporter:`pwd`:$PYTHONPATH:venv/lib/python2.7/site-packages/; \
     nosetests -v --with-id  --with-xunit --verbose --cover-package=reporter reporter
 
-Using Docker
+## Running tests from pycharm
+
+Create a new test configuration by right clicking on the test directory
+and clicking 'Run unit tests'. After the tests probably fail, use this
+menu to edit the configuration: Run -> Edit configurations. Now choose
+test configuration and set the following environment variables.
+
+* **PGHOST:** - localhost
+* **PGPORT:** - 5433
+* **PGUSER:** - docker
+* **PGPASSWORD:** - docker
+* **Include parent environment variables:** - Uncheck this option
+
+Apply your changes then rerun the tests. All tests should pass now.
+
+## Using Docker
 
     docker-compose build test
     docker-compose run test
+
+## In travis
+
+See the .travis file for travis specific info. Note that selenium based
+frontend testing is currently disabled in travis via the ON_TRAVIS
+environment variable. You can use this variable to disable selenium
+tests on your desktop too if needed.
+
 
 # Continuous integration
 
