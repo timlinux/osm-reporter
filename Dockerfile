@@ -13,7 +13,8 @@ RUN  dpkg-divert --local --rename --add /sbin/initctl
 ADD 71-apt-cacher-ng /etc/apt/apt.conf.d/71-apt-cacher-ng
 
 RUN apt-get -y update
-RUN apt-get -y install osm2pgsql
+RUN apt-get -y install osm2pgsql wget unzip
+RUN wget -O osm-snap.zip "https://github.com/ericfischer/osm-snap/archive/master.zip" && unzip osm-snap.zip && cd osm-snap-master && make && mv snap /usr/local/bin
 
 ADD requirements.txt /requirements.txt
 RUN pip install -r requirements.txt
